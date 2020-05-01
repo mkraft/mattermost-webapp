@@ -1,6 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import Rego from '@open-policy-agent/opa-wasm';
+
 import $ from 'jquery';
 
 import PropTypes from 'prop-types';
@@ -303,6 +305,23 @@ export default class Root extends React.Component {
             this.onConfigLoaded();
         });
         trackLoadTime();
+        this.loadPolicies().then((policies) => {
+            window.Mattermost = {Authz: {policies}};
+        });
+    }
+
+    async loadPolicies() {
+        const url = 'http://localhost:8065/static/files/wasm/policy.wasm'; 
+        const rego = new Rego();
+        const response = await fetch(url);
+        const bytes = await response.arrayBuffer();
+        let policies;
+        try {
+            policies = await rego.load_policy(bytes);
+        } catch(err) {
+            console.error(err);
+        }
+        return policies;
     }
 
     componentWillUnmount() {

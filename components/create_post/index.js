@@ -6,7 +6,7 @@ import {bindActionCreators} from 'redux';
 import {getConfig} from 'mattermost-redux/selectors/entities/general';
 import {getCurrentTeamId} from 'mattermost-redux/selectors/entities/teams';
 
-import {getCurrentChannel, getCurrentChannelStats, getChannelMemberCountsByGroup} from 'mattermost-redux/selectors/entities/channels';
+import {getCurrentChannel, getCurrentChannelStats, getChannelMemberCountsByGroup, getMyChannelMember} from 'mattermost-redux/selectors/entities/channels';
 import {getCurrentUserId, isCurrentUserSystemAdmin, getStatusForUserId} from 'mattermost-redux/selectors/entities/users';
 import {haveIChannelPermission} from 'mattermost-redux/selectors/entities/roles';
 import {getChannelTimezones, getChannelMemberCountsByGroup as selectChannelMemberCountsByGroup} from 'mattermost-redux/actions/channels';
@@ -71,14 +71,42 @@ function makeMapStateToProps() {
         const badConnection = connectionErrorCount(state) > 1;
         const isTimezoneEnabled = config.ExperimentalTimezone === 'true';
         const shortcutReactToLastPostEmittedFrom = getShortcutReactToLastPostEmittedFrom(state);
-        const canPost = haveIChannelPermission(
-            state,
-            {
-                channel: currentChannel.id,
-                team: currentChannel.team_id,
-                permission: Permissions.CREATE_POST,
+
+        // data would come from the db
+        const data = {
+            post_restricted_channels: {
+                user: [
+                    'c3r1pae4hjrepx6qfghatmeekc'
+                ],
+                guest: [],
+                admin: []
             }
-        );
+        };
+
+        const channelMember = getMyChannelMember(state, currentChannel.id);
+
+        let role;
+        if (channelMember.scheme_admin) {
+            role = 'admin';
+        } else if (channelMember.scheme_user) {
+            role = 'user';
+        } else if (channelMember.scheme_guest) {
+            role = 'guest';
+        } else {
+            console.error('unknown role');
+        }
+
+        const input = {
+            subject: {type: 'person', attributes: {channel_role: `${role}`}},
+            operation: 'write',
+            resource: {type: 'post', attributes: {channel_id: `${currentChannel.id}`}}
+        };
+
+        const {policies} = window.Mattermost.Authz;
+        policies.set_data(data);
+        const result = policies.evaluate(input);
+        const canPost = result[0].x;
+
         const useChannelMentions = haveIChannelPermission(state, {
             channel: currentChannel.id,
             team: currentChannel.team_id,
