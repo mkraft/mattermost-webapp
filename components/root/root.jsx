@@ -311,7 +311,7 @@ export default class Root extends React.Component {
     }
 
     async loadPolicies() {
-        const url = 'http://localhost:8065/static/files/wasm/policy.wasm'; 
+        const url = `${window.location.origin}/static/files/wasm/policy.wasm`; 
         const rego = new Rego();
         const response = await fetch(url);
         const bytes = await response.arrayBuffer();
